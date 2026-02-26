@@ -1,0 +1,39 @@
+name: ADK docs sync (apply payload)
+
+on:
+  repository_dispatch:
+    types: [adk-docs-sync]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write payload
+        run: |
+          python3 -c "
+          import json, os
+          p = json.loads(os.environ.get('CLIENT_PAYLOAD', '{}'))
+          if p and 'skills' not in p and p.get('skill_name'):
+            p = {'skills': [p]}
+          json.dump(p if p else {'skills': []}, open('/tmp/payload.json', 'w'))
+          "
+        env:
+          CLIENT_PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+
+      - name: Apply sync payload
+        id: apply
+        run: python3 scripts/apply_sync_payload.py "$GITHUB_WORKSPACE" @/tmp/payload.json
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet && git diff --staged --quiet && echo "No changes to commit" || {
+            git add -A
+            git commit -m "chore(skills): sync from LYZR ADK docs [automated]"
+            git push
+          }

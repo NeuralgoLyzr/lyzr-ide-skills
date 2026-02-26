@@ -1,0 +1,141 @@
+# Maps LYZR ADK doc paths to ide_skills and section headings.
+# Used by the sync workflow to apply section-level updates only.
+# Default: if doc_path has no entry, use path_prefix_rules to resolve skill;
+# new doc folders (no match) → generate new skill.
+
+path_prefix_rules:
+  agents: lyzr-agent
+  studio: lyzr-agent
+  overview: lyzr-agent
+  providers: lyzr-agent
+  responses: lyzr-agent
+  exceptions: lyzr-agent
+  streaming: lyzr-agent
+  "structured-outputs": lyzr-agent
+  tools: lyzr-agent
+  contexts: lyzr-agent
+  "knowledge-bases": lyzr-rag
+  memory: lyzr-memory
+  "rai-guardrails": lyzr-guardrails
+  "file-image-output": lyzr-file-image-output
+
+mappings:
+  - doc_path: agents/creating-agents.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Step 2: Create an Agent"
+  - doc_path: agents/managing-agents.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Agent Lifecycle Management"
+  - doc_path: agents/running-agents.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Step 3: Run the Agent"
+      - skill_heading: "## Streaming Responses"
+      - skill_heading: "## Structured Outputs (Type-Safe Responses)"
+  - doc_path: agents/agent-features.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Adding Tools (Local Python Functions)"
+      - skill_heading: "## Contexts"
+  - doc_path: agents/overview.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Overview"
+  - doc_path: contexts/contexts.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Contexts"
+  - doc_path: exceptions/exceptions.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Error Handling"
+  - doc_path: streaming/streaming.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Streaming Responses"
+  - doc_path: "structured-outputs/structured-outputs.mdx"
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Structured Outputs (Type-Safe Responses)"
+  - doc_path: tools/overview.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Adding Tools (Local Python Functions)"
+  - doc_path: tools/creating-tools.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Adding Tools (Local Python Functions)"
+  - doc_path: providers/providers.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "### Supported Providers & Models"
+  - doc_path: studio.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Step 1: Initialize the Studio"
+  - doc_path: overview.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Overview"
+  - doc_path: "knowledge-bases/creating-kb.mdx"
+    skill: lyzr-rag
+    sections:
+      - skill_heading: "## Step 1: Create a Knowledge Base"
+  - doc_path: "knowledge-bases/adding-documents.mdx"
+    skill: lyzr-rag
+    sections:
+      - skill_heading: "## Step 2: Add Documents"
+  - doc_path: "knowledge-bases/querying.mdx"
+    skill: lyzr-rag
+    sections:
+      - skill_heading: "## Step 3: Query the Knowledge Base Directly"
+      - skill_heading: "## Step 4: Connect to an Agent"
+  - doc_path: "knowledge-bases/managing-kb.mdx"
+    skill: lyzr-rag
+    sections:
+      - skill_heading: "## Managing Documents"
+  - doc_path: "knowledge-bases/overview.mdx"
+    skill: lyzr-rag
+    sections:
+      - skill_heading: "## Overview"
+  - doc_path: memory/overview.mdx
+    skill: lyzr-memory
+    sections:
+      - skill_heading: "## Overview"
+  - doc_path: memory/agent-memory.mdx
+    skill: lyzr-memory
+    sections:
+      - skill_heading: "## Option 1: Built-in Message Memory"
+      - skill_heading: "## Using Sessions for Context Continuity"
+      - skill_heading: "## Option 2: External Memory Providers"
+  - doc_path: "rai-guardrails/overview.mdx"
+    skill: lyzr-guardrails
+    sections:
+      - skill_heading: "## Overview"
+  - doc_path: "rai-guardrails/rai-features.mdx"
+    skill: lyzr-guardrails
+    sections:
+      - skill_heading: "## Step 1: Import RAI Types"
+      - skill_heading: "## Step 2: Create a Safety Policy"
+  - doc_path: "rai-guardrails/creating-policies.mdx"
+    skill: lyzr-guardrails
+    sections:
+      - skill_heading: "## Step 2: Create a Safety Policy"
+      - skill_heading: "## Managing Policies"
+  - doc_path: "file-image-output/overview.mdx"
+    skill: lyzr-file-image-output
+    sections:
+      - skill_heading: "## Overview"
+      - skill_heading: "## File Output"
+      - skill_heading: "## Image Output"
+      - skill_heading: "## Artifact Class"
+  - doc_path: "file-image-output/file-generation.mdx"
+    skill: lyzr-file-image-output
+    sections:
+      - skill_heading: "## File Output"
+  - doc_path: "file-image-output/image-generation.mdx"
+    skill: lyzr-file-image-output
+    sections:
+      - skill_heading: "## Image Output"
