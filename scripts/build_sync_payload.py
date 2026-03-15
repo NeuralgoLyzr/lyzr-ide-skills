@@ -161,7 +161,7 @@ Output valid JSON only: {{"updates\": [{{\"section_heading\": \"## Exact Heading
             if u not in skills_updates[skill_name]["section_updates"]:
                 skills_updates[skill_name]["section_updates"].append(u)
     result = {"skills": list(skills_updates.values())}
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":
