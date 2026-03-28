@@ -19,9 +19,11 @@ except ImportError:
 
 FALLBACK_SYSTEM_PROMPT = (
     "You output only valid JSON. No markdown code fence. "
+    "Surgical edits only: change the smallest substring needed to align the skill section with the docs. "
+    "Do not rewrite whole sections, reorder unrelated content, or add filler. "
     "Generate minimal patch hunks for a single skill section. "
     'Schema: {"updates":[{"section_heading":"## Exact Heading","patches":[{"context_before":"","old":"","new":"","context_after":""}]}]}. '
-    'Return {"updates": []} when no doc-backed change is required.'
+    'Return {"updates": []} when the section already matches the docs or no doc-backed change is required.'
 )
 
 MAX_DOC_BUNDLE_CHARS = 50000
@@ -165,8 +167,16 @@ def call_llm_openai(
     timeout: int = 120,
 ) -> str:
     try:
+        import urllib.error
         import urllib.request
+
         model = os.environ.get("SYNC_LLM_MODEL", "gpt-4o")
+        max_user = int(os.environ.get("SYNC_LLM_USER_MAX_CHARS", "28000"))
+        if len(user_prompt) > max_user:
+            user_prompt = (
+                user_prompt[:max_user]
+                + f"\n\n_(user prompt truncated to {max_user} chars; set SYNC_LLM_USER_MAX_CHARS to raise)_\n"
+            )
         payload: dict = {
             "model": model,
             "messages": [
@@ -174,9 +184,8 @@ def call_llm_openai(
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.0,
+            "max_tokens": 4096 if max_tokens is None else max_tokens,
         }
-        if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
         body = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             "https://api.openai.com/v1/chat/completions",
@@ -189,6 +198,12 @@ def call_llm_openai(
         if data.get("error"):
             return json.dumps({"updates": [], "_error": str(data["error"])})
         return data["choices"][0]["message"]["content"].strip()
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:2000]
+        except OSError:
+            detail = ""
+        return json.dumps({"updates": [], "_error": f"{exc} {detail}"})
     except Exception as exc:
         return json.dumps({"updates": [], "_error": str(exc)})
 
@@ -244,37 +259,53 @@ def _unsupported_added_lines(old: str, new: str, doc_bundle: str) -> list[str]:
     return bad
 
 
+def _unique_suffix_anchor(section_text: str, min_len: int = 100, max_len: int = 2400) -> str:
+    """Prefer a short unique tail of the section so patches stay small for repository_dispatch limits."""
+    text = section_text
+    if len(text) <= min_len:
+        return text
+    upper = min(len(text), max_len)
+    for size in range(min_len, upper + 1, 50):
+        suffix = text[-size:]
+        if text.count(suffix) == 1:
+            return suffix
+    return text
+
+
 def _doc_append_fallback_patch(
     section_heading: str,
     current_body: str,
     doc_bundle: str,
 ) -> dict | None:
     """
-    When the LLM returns no valid patches, append doc excerpts to the section so sync is not a no-op.
-    Set SYNC_DISABLE_DOC_APPEND_FALLBACK=1 to skip.
+    Optional: when the LLM returns no valid patches, append a short doc excerpt (not surgical).
+    Off by default. Enable with SYNC_ENABLE_DOC_APPEND_FALLBACK=1 (e.g. local debugging).
+    SYNC_DISABLE_DOC_APPEND_FALLBACK=1 forces off.
     """
     if os.environ.get("SYNC_DISABLE_DOC_APPEND_FALLBACK", "").lower() in ("1", "true", "yes"):
+        return None
+    if os.environ.get("SYNC_ENABLE_DOC_APPEND_FALLBACK", "").lower() not in ("1", "true", "yes"):
         return None
     body = current_body.strip()
     if not body or not doc_bundle.strip():
         return None
     snippet = doc_bundle.strip()
-    max_snip = int(os.environ.get("SYNC_FALLBACK_DOC_MAX_CHARS", "12000"))
+    max_snip = int(os.environ.get("SYNC_FALLBACK_DOC_MAX_CHARS", "1200"))
     if len(snippet) > max_snip:
-        snippet = snippet[:max_snip] + "\n\n_(truncated for skill size)_"
+        snippet = snippet[:max_snip] + "\n\n_(truncated)_"
     append_block = (
-        "\n\n---\n\n### ADK documentation (sync)\n\n"
-        "Merged from the latest ADK docs when no surgical patch was produced. "
-        "Edit this skill section as needed.\n\n"
+        "\n\n---\n\n**ADK doc sync** (no LLM patch). See source docs in `lyzr-adk/` for full text.\n\n"
         f"{snippet}\n"
     )
+    old_anchor = _unique_suffix_anchor(current_body)
+    new_text = old_anchor + append_block
     tentative = {
         "section_heading": section_heading,
         "patches": [
             {
                 "context_before": "",
-                "old": current_body,
-                "new": current_body.rstrip() + append_block,
+                "old": old_anchor,
+                "new": new_text,
                 "context_after": "",
             }
         ],
@@ -511,6 +542,8 @@ def main() -> None:
             "Doc excerpts (ADK source of truth):\n---\n"
             f"{doc_bundle}\n---\n\n"
             f"Allowed heading: {section_heading}\n\n"
+            "SURGICAL: Update only what the doc excerpts require; preserve tone, structure, and unrelated bullets. "
+            "Do not replace the entire section unless every part is wrong per the docs.\n\n"
             "ANCHOR RULES: Prefer the full anchor context_before+old+context_after copied EXACTLY from the "
             "section body (must match once). If that is fragile, use empty context_before and context_after "
             "and set old to a UNIQUE substring that appears exactly once (multi-line code block preferred; "
