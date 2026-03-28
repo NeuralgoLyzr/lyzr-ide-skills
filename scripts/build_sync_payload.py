@@ -170,7 +170,7 @@ def call_llm_openai(
         import urllib.error
         import urllib.request
 
-        model = os.environ.get("SYNC_LLM_MODEL", "gpt-4o")
+        model = (os.environ.get("SYNC_LLM_MODEL") or "gpt-4o").strip()
         max_user = int(os.environ.get("SYNC_LLM_USER_MAX_CHARS", "28000"))
         if len(user_prompt) > max_user:
             user_prompt = (
