@@ -29,6 +29,17 @@ FALLBACK_SYSTEM_PROMPT = (
 MAX_DOC_BUNDLE_CHARS = 50000
 MAX_SECTION_CHARS = 25000
 MIN_DOC_LINE_LEN = 4
+DEFAULT_GITHUB_DISPATCH_SKILLS_JSON_MAX = 52000
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
 
 
 def _load_env_file(ide_root: Path) -> None:
@@ -171,21 +182,32 @@ def call_llm_openai(
         import urllib.request
 
         model = (os.environ.get("SYNC_LLM_MODEL") or "gpt-4o").strip()
-        max_user = int(os.environ.get("SYNC_LLM_USER_MAX_CHARS", "28000"))
+        max_user = _env_int("SYNC_LLM_USER_MAX_CHARS", 28000)
         if len(user_prompt) > max_user:
             user_prompt = (
                 user_prompt[:max_user]
                 + f"\n\n_(user prompt truncated to {max_user} chars; set SYNC_LLM_USER_MAX_CHARS to raise)_\n"
             )
+        tok = 4096 if max_tokens is None else max_tokens
+        model_l = model.lower()
+        use_completion_tok = (
+            model_l.startswith("o1")
+            or model_l.startswith("o3")
+            or "gpt-5" in model_l
+            or os.environ.get("SYNC_OPENAI_USE_MAX_COMPLETION_TOKENS", "").lower() in ("1", "true", "yes")
+        )
         payload: dict = {
             "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "temperature": 0.0,
-            "max_tokens": 4096 if max_tokens is None else max_tokens,
         }
+        if not use_completion_tok:
+            payload["temperature"] = 0.0
+            payload["max_tokens"] = tok
+        else:
+            payload["max_completion_tokens"] = tok
         body = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             "https://api.openai.com/v1/chat/completions",
@@ -206,6 +228,89 @@ def call_llm_openai(
         return json.dumps({"updates": [], "_error": f"{exc} {detail}"})
     except Exception as exc:
         return json.dumps({"updates": [], "_error": str(exc)})
+
+
+def call_llm_gemini(
+    system_prompt: str,
+    user_prompt: str,
+    api_key: str,
+    *,
+    max_tokens: int | None = None,
+    timeout: int = 120,
+) -> str:
+    try:
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+
+        model = (os.environ.get("SYNC_LLM_MODEL") or "gemini-1.5-flash").strip()
+        if model.startswith("gpt-") or model.startswith("openai/"):
+            model = "gemini-1.5-flash"
+        elif "/" in model:
+            model = model.split("/")[-1]
+        max_user = _env_int("SYNC_LLM_USER_MAX_CHARS", 28000)
+        if len(user_prompt) > max_user:
+            user_prompt = (
+                user_prompt[:max_user]
+                + f"\n\n_(user prompt truncated to {max_user} chars)_\n"
+            )
+        out_cap = 8192 if max_tokens is None else min(8192, max_tokens)
+        body: dict = {
+            "systemInstruction": {"parts": [{"text": system_prompt}]},
+            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+            "generationConfig": {
+                "temperature": 0.0,
+                "maxOutputTokens": out_cap,
+            },
+        }
+        q = urllib.parse.urlencode({"key": api_key})
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?{q}"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode())
+        if data.get("error"):
+            return json.dumps({"updates": [], "_error": str(data["error"])})
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return json.dumps({"updates": [], "_error": "Gemini returned no candidates (blocked or empty)"})
+        parts = (candidates[0].get("content") or {}).get("parts") or []
+        texts = [p.get("text", "") for p in parts if isinstance(p, dict)]
+        text = "".join(texts).strip()
+        return text if text else json.dumps({"updates": [], "_error": "Gemini empty text response"})
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:2000]
+        except OSError:
+            detail = ""
+        return json.dumps({"updates": [], "_error": f"{exc} {detail}"})
+    except Exception as exc:
+        return json.dumps({"updates": [], "_error": str(exc)})
+
+
+def invoke_llm(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    max_tokens: int | None = None,
+    timeout: int = 120,
+) -> str:
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    pref = (os.environ.get("SYNC_LLM_PROVIDER") or "").strip().lower()
+    if pref == "gemini" and gemini_key:
+        return call_llm_gemini(system_prompt, user_prompt, gemini_key, max_tokens=max_tokens, timeout=timeout)
+    if pref == "openai" and openai_key:
+        return call_llm_openai(system_prompt, user_prompt, openai_key, max_tokens=max_tokens, timeout=timeout)
+    if openai_key:
+        return call_llm_openai(system_prompt, user_prompt, openai_key, max_tokens=max_tokens, timeout=timeout)
+    if gemini_key:
+        return call_llm_gemini(system_prompt, user_prompt, gemini_key, max_tokens=max_tokens, timeout=timeout)
+    return json.dumps({"updates": [], "_error": "No OPENAI_API_KEY or GEMINI_API_KEY"})
 
 
 def _safe_json_loads(raw: str) -> dict:
@@ -290,14 +395,14 @@ def _doc_append_fallback_patch(
     if not body or not doc_bundle.strip():
         return None
     snippet = doc_bundle.strip()
-    max_snip = int(os.environ.get("SYNC_FALLBACK_DOC_MAX_CHARS", "1200"))
+    max_snip = _env_int("SYNC_FALLBACK_DOC_MAX_CHARS", 500)
     if len(snippet) > max_snip:
         snippet = snippet[:max_snip] + "\n\n_(truncated)_"
     append_block = (
-        "\n\n---\n\n**ADK doc sync** (no LLM patch). See source docs in `lyzr-adk/` for full text.\n\n"
+        "\n\n---\n\n**ADK doc sync** (no LLM patch). Fix LLM/API and re-sync, or edit from `lyzr-adk/`.\n\n"
         f"{snippet}\n"
     )
-    old_anchor = _unique_suffix_anchor(current_body)
+    old_anchor = _unique_suffix_anchor(current_body, min_len=40, max_len=320)
     new_text = old_anchor + append_block
     tentative = {
         "section_heading": section_heading,
@@ -453,7 +558,39 @@ def _llm_error_from_raw(raw: str) -> str | None:
     return str(err) if err else None
 
 
-def _run_new_skill_generation(job: dict, api_key: str, scripts_dir: Path) -> tuple[str | None, str | None]:
+def _skills_json_utf8_len(skills: list[dict]) -> int:
+    return len(json.dumps({"skills": skills}, ensure_ascii=False).encode("utf-8"))
+
+
+def _skill_entry_json_bytes(sk: dict) -> int:
+    return len(json.dumps(sk, ensure_ascii=False).encode("utf-8"))
+
+
+def shrink_skills_for_github_dispatch(skills: list[dict]) -> None:
+    cap = _env_int("GITHUB_DISPATCH_SKILLS_JSON_MAX", DEFAULT_GITHUB_DISPATCH_SKILLS_JSON_MAX)
+    while skills and _skills_json_utf8_len(skills) > cap:
+        candidates: list[tuple[int, int | None, int]] = []
+        for si, sk in enumerate(skills):
+            if sk.get("new_skill"):
+                candidates.append((si, None, _skill_entry_json_bytes(sk)))
+            for ei, sec in enumerate(sk.get("section_patches") or []):
+                cost = len(json.dumps(sec, ensure_ascii=False).encode("utf-8"))
+                candidates.append((si, ei, cost))
+        if not candidates:
+            break
+        si, ei, _cost = max(candidates, key=lambda x: x[2])
+        if ei is None:
+            print(f"[dispatch-limit] dropping new_skill {skills[si].get('skill_name')}", file=sys.stderr)
+            skills.pop(si)
+            continue
+        heading = skills[si]["section_patches"][ei].get("section_heading")
+        del skills[si]["section_patches"][ei]
+        print(f"[dispatch-limit] dropped {skills[si].get('skill_name')}:{heading}", file=sys.stderr)
+        if not skills[si].get("section_patches"):
+            skills.pop(si)
+
+
+def _run_new_skill_generation(job: dict, scripts_dir: Path) -> tuple[str | None, str | None]:
     sys_p = load_new_skill_system_prompt(scripts_dir)
     user_p = (
         f"skill_folder_name: {job['skill_name']}\n"
@@ -463,7 +600,7 @@ def _run_new_skill_generation(job: dict, api_key: str, scripts_dir: Path) -> tup
         f"{job['doc_bundle']}\n---\n\n"
         "Write the complete SKILL.md now."
     )
-    raw = call_llm_openai(sys_p, user_p, api_key, max_tokens=16000, timeout=180)
+    raw = invoke_llm(sys_p, user_p, max_tokens=16000, timeout=180)
     err = _llm_error_from_raw(raw)
     if err:
         return None, err
@@ -491,8 +628,7 @@ def main() -> None:
     for msg in skipped:
         print(msg, file=sys.stderr)
 
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    if not api_key:
+    if not (os.environ.get("OPENAI_API_KEY", "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()):
         print("Set OPENAI_API_KEY or GEMINI_API_KEY", file=sys.stderr)
         sys.exit(1)
 
@@ -555,7 +691,7 @@ def main() -> None:
         user_prompt = prompt
         accepted = None
         for attempt in range(2):
-            raw = call_llm_openai(system_prompt, user_prompt, api_key)
+            raw = invoke_llm(system_prompt, user_prompt)
             parsed = _safe_json_loads(raw)
             if parsed.get("_error"):
                 print(f"[{skill_name}:{section_heading}] LLM error: {parsed['_error']}", file=sys.stderr)
@@ -607,7 +743,7 @@ def main() -> None:
     out_skills: list[dict] = list(skills_updates.values())
     ns_prompt_dir = ide_root / "scripts"
     for job in _collect_new_skill_jobs(changed, mapping, ide_root, docs_root):
-        full_md, ns_err = _run_new_skill_generation(job, api_key, ns_prompt_dir)
+        full_md, ns_err = _run_new_skill_generation(job, ns_prompt_dir)
         if ns_err:
             print(f"[new_skill:{job['skill_name']}] {ns_err}", file=sys.stderr)
             continue
@@ -618,6 +754,7 @@ def main() -> None:
                 "full_content": full_md,
             })
 
+    shrink_skills_for_github_dispatch(out_skills)
     print(json.dumps({"skills": out_skills}))
 
 

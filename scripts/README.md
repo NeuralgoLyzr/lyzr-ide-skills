@@ -37,6 +37,8 @@ python scripts/build_sync_payload.py <ide_skills_root> <docs_root> <changed_file
 
 `changed_files.json` is a JSON array of paths like `lyzr-adk/agents/overview.mdx` (relative to `docs_root` or including `lyzr-adk/`). Loads **.env** from `ide_skills` root for keys when not set in the shell.
 
+**CI (documentation repo):** stdout is redirected to `.adk-sync-payload.json`; **`shrink_skills_for_github_dispatch`** keeps `{"skills":...}` under **`GITHUB_DISPATCH_SKILLS_JSON_MAX`** (default 52000 UTF-8 bytes) so `repository_dispatch` stays under GitHub’s 65535-byte `client_payload` cap.
+
 ### apply_skill_updates.py
 
 ```bash
