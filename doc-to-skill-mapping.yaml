@@ -1,7 +1,13 @@
 # Maps LYZR ADK doc paths to ide_skills and section headings.
 # Used by the sync workflow to apply section-level updates only.
-# Default: if doc_path has no entry, use path_prefix_rules to resolve skill;
-# new doc folders (no match) → generate new skill.
+#
+# path_prefix_rules: used only to warn when a doc is unmapped but the folder
+#   would imply an existing skill — add an explicit mapping entry instead.
+#
+# new_skill_triggers: when a changed doc path starts with `path_prefix/` and
+#   skills/<skill_name>/SKILL.md does NOT exist, build_sync_payload asks the LLM
+#   for a full SKILL.md and emits new_skill + full_content (apply_sync_payload
+#   creates the folder). Use this when ADK adds a new top-level doc area.
 
 path_prefix_rules:
   agents: lyzr-agent
@@ -18,6 +24,14 @@ path_prefix_rules:
   memory: lyzr-memory
   "rai-guardrails": lyzr-guardrails
   "file-image-output": lyzr-file-image-output
+
+# Example when ADK adds a new folder (e.g. lyzr-adk/billing/*.mdx):
+# new_skill_triggers:
+#   - path_prefix: billing
+#     skill_name: lyzr-billing
+#     skill_title: "LYZR Billing"
+# Also add billing: lyzr-billing under path_prefix_rules so future unmapped docs warn correctly.
+new_skill_triggers: []
 
 mappings:
   - doc_path: agents/creating-agents.mdx
@@ -39,6 +53,14 @@ mappings:
     sections:
       - skill_heading: "## Adding Tools (Local Python Functions)"
       - skill_heading: "## Contexts"
+  - doc_path: responses/responses.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Agent Responses"
+  - doc_path: tools/tool-execution.mdx
+    skill: lyzr-agent
+    sections:
+      - skill_heading: "## Tool Execution"
   - doc_path: agents/overview.mdx
     skill: lyzr-agent
     sections:
@@ -110,6 +132,30 @@ mappings:
       - skill_heading: "## Option 1: Built-in Message Memory"
       - skill_heading: "## Using Sessions for Context Continuity"
       - skill_heading: "## Option 2: External Memory Providers"
+  - doc_path: memory/cognis-overview.mdx
+    skill: lyzr-memory
+    sections:
+      - skill_heading: "## Cognis Memory"
+  - doc_path: memory/add-memories.mdx
+    skill: lyzr-memory
+    sections:
+      - skill_heading: "## Cognis Memory"
+  - doc_path: memory/search-memories.mdx
+    skill: lyzr-memory
+    sections:
+      - skill_heading: "## Cognis Memory"
+  - doc_path: memory/get-memories.mdx
+    skill: lyzr-memory
+    sections:
+      - skill_heading: "## Cognis Memory"
+  - doc_path: memory/update-memories.mdx
+    skill: lyzr-memory
+    sections:
+      - skill_heading: "## Cognis Memory"
+  - doc_path: memory/delete-memories.mdx
+    skill: lyzr-memory
+    sections:
+      - skill_heading: "## Cognis Memory"
   - doc_path: "rai-guardrails/overview.mdx"
     skill: lyzr-guardrails
     sections:
