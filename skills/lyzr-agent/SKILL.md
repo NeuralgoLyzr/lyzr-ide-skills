@@ -16,7 +16,7 @@ author: LYZR AI
 
 ## Overview
 
-Create and manage AI agents via the API. Supports CRUD, configuration, versioning, and agent lifecycle. **Total Endpoints:** 12
+The ADK treats an agent as a configurable object: you define behavior with `role`, `goal`, and `instructions`, pick a `provider` / model, then layer optional capabilities (memory, tools, RAG, guardrails). The same agent instance can be run interactively, behind an API, or in batch jobs; only the calling pattern changes. Keep agent names and descriptions meaningful in Studio so operators can audit which automations map to which workloads.
 
 ## Setup
 
@@ -119,19 +119,18 @@ No decorators needed — just pass any function:
 
 ```python
 def get_weather(city: str) -> dict:
-    """Fetch current weather for a city"""
+    """Get current weather for a city"""
     # Your implementation here
     return {"city": city, "temp": "22°C", "condition": "Sunny"}
 
-def search_database(query: str) -> list:
-    """Search internal database"""
-    return [{"id": 1, "result": "..."}]
+def search_database(query: str) -> str:
+    """Search the database for records"""
+    return "Found results for query"
 
 agent.add_tool(get_weather)
 agent.add_tool(search_database)
 
 response = agent.run("What's the weather in London?")
-print(response.response)
 ```
 
 ---
@@ -163,7 +162,7 @@ agent = studio.create_agent(
     role="Customer support",
     goal="Help customers with inquiries"
 )
-agent.add_context(context)
+agent = agent.add_context(context)
 
 # Or pass at creation
 agent = studio.create_agent(..., contexts=[context])
