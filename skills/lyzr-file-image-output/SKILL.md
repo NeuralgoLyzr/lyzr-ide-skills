@@ -1,7 +1,7 @@
 ---
 name: lyzr-file-image-output
 description: Generate files (PDF, DOCX, CSV) and images with LYZR agents. Enable file_output or image_model; download artifacts via response.files.
-license: MIT
+license: Apache-2.0
 allowed-tools:
   - Studio
   - file_output

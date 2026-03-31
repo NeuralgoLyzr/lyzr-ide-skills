@@ -5,7 +5,7 @@ description: >
   Maintains Cursor skills for the LYZR ADK Python SDK: keeps skills/lyzr-* SKILL.md files
   aligned with official ADK documentation, doc-to-skill-mapping.yaml, and repo sync scripts.
 author: LYZR AI
-license: MIT
+license: Apache-2.0
 
 model:
   preferred: claude-sonnet-4-5

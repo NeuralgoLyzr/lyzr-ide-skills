@@ -1,7 +1,7 @@
 ---
 name: lyzr-rag
 description: Add retrieval-augmented generation (RAG) to LYZR agents. Covers creating knowledge bases, ingesting documents (PDF, DOCX, websites, text), querying, and connecting to agents.
-license: MIT
+license: Apache-2.0
 allowed-tools:
   - Studio
   - KnowledgeBase

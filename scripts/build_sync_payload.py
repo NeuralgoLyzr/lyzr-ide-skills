@@ -220,7 +220,7 @@ def load_system_prompt(scripts_dir: Path) -> str:
 
 NEW_SKILL_FALLBACK_SYSTEM = (
     "You author a complete Cursor SKILL.md from LYZR ADK documentation. "
-    "YAML frontmatter: name, description, license MIT, allowed-tools (list), triggers (list), "
+    "YAML frontmatter: name, description, license Apache-2.0, allowed-tools (list), triggers (list), "
     "metadata {author, version, category}. Body: # H1, ## Instructions (numbered), ## Overview, ## Setup, "
     "then doc sections with ##/### headings; balanced code fences. Start with ---. Under 450 lines. No JSON."
 )

@@ -1,7 +1,7 @@
 ---
 name: lyzr-guardrails
 description: Add responsible AI (RAI) safety guardrails to LYZR agents. Covers toxicity detection, PII protection, secrets masking, topic filtering, NSFW detection, and prompt injection prevention.
-license: MIT
+license: Apache-2.0
 allowed-tools:
   - Studio
   - create_rai_policy

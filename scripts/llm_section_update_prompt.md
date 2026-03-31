@@ -86,7 +86,7 @@ Output rules:
 - The file **must** start with YAML frontmatter between `---` lines, in this exact shape:
   - `name` (string) — must match the skill folder name from the user message (kebab-case, e.g. `lyzr-billing`)
   - `description` (string) — one-line summary of what the skill covers
-  - `license` — use `MIT`
+  - `license` — use `Apache-2.0` (repo default; not MIT)
   - `allowed-tools` (YAML list of short strings) — SDK or API capability hints for this skill (e.g. `Studio`, `KnowledgeBase`), not unrelated generic tools
   - `triggers` (YAML list of short strings) — natural phrases that should activate this skill in the IDE
   - `metadata` (mapping): `author` (e.g. `LYZR AI`), `version` (quoted semver string), `category` (one of: `sdk`, `rag`, `memory`, `safety`, `output`, `assets`, or another single lowercase slug that fits the domain)
