@@ -1,0 +1,36 @@
+spec_version: "0.1.0"
+name: lyzr-ide-skills-maintainer
+version: 1.0.0
+description: >
+  Maintains Cursor skills for the LYZR ADK Python SDK: keeps skills/lyzr-* SKILL.md files
+  aligned with official ADK documentation, doc-to-skill-mapping.yaml, and repo sync scripts.
+author: LYZR AI
+license: MIT
+
+model:
+  preferred: claude-sonnet-4-5
+  fallback:
+    - claude-haiku-4-5
+  constraints:
+    temperature: 0.2
+    max_tokens: 8192
+
+skills:
+  - lyzr-agent
+  - lyzr-rag
+  - lyzr-memory
+  - lyzr-guardrails
+  - lyzr-file-image-output
+  - lyzr-assets
+
+tools:
+  - read-edit-skills
+  - read-doc-to-skill-mapping
+  - run-local-sync
+  - build-sync-payload
+  - apply-sync-payload
+  - apply-skill-updates
+
+runtime:
+  max_turns: 40
+  timeout: 300

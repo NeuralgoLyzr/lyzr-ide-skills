@@ -1,8 +1,24 @@
+# Applies sync payload from docs repo, then opens a PR into the base branch (client_payload.target_branch).
+#
+# CRITICAL — repository_dispatch behavior:
+#   GitHub only loads THIS workflow from the repo DEFAULT branch (e.g. main). If this file exists only on
+#   a feature branch, pushes to that branch do NOT change what runs when the docs repo dispatches here.
+#   Merge this workflow to default branch so the PR-creation steps actually run.
+#
+# Optional: if PR/push fails with GITHUB_TOKEN (org policy), add repo secret IDE_SKILLS_WORKFLOW_TOKEN:
+#   classic PAT with repo scope, or fine-grained PAT with Contents + Pull requests on this repo.
+#
+# Set client_payload.direct_push: true to push straight to base (no PR).
+
 name: ADK docs sync (apply payload)
 
 on:
   repository_dispatch:
     types: [adk-docs-sync]
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   apply:
@@ -10,7 +26,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.IDE_SKILLS_WORKFLOW_TOKEN || github.token }}
+          fetch-depth: 0
+
+      - name: Set target branch
+        id: branch
+        run: |
+          TARGET="${{ github.event.client_payload.target_branch }}"
+          if [ -z "$TARGET" ]; then
+            TARGET=$(git rev-parse --abbrev-ref HEAD)
+          fi
+          echo "branch=$TARGET" >> $GITHUB_OUTPUT
+          echo "Target base branch (PR merge target): $TARGET"
+
+      - name: Direct push mode (optional)
+        id: mode
+        run: |
+          if [ "${{ github.event.client_payload.direct_push }}" = "true" ]; then
+            echo "direct=true" >> $GITHUB_OUTPUT
+          else
+            echo "direct=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout target branch (direct push only)
+        if: steps.mode.outputs.direct == 'true' && steps.branch.outputs.branch != github.ref_name
+        run: |
+          BRANCH="${{ steps.branch.outputs.branch }}"
+          git fetch origin "$BRANCH" 2>/dev/null || true
+          if git show-ref --quiet refs/remotes/origin/"$BRANCH"; then
+            git checkout "$BRANCH"
+          else
+            git checkout -b "$BRANCH"
+          fi
+
+      - name: Prepare sync branch (PR mode)
+        id: sync_branch
+        if: steps.mode.outputs.direct != 'true'
+        run: |
+          set -euo pipefail
+          BASE="${{ steps.branch.outputs.branch }}"
+          git fetch origin "$BASE" 2>/dev/null || true
+          SYNC_BRANCH="sync/adk-docs-${{ github.run_id }}-${{ github.run_attempt }}"
+          if ! git show-ref --quiet refs/remotes/origin/"$BASE"; then
+            echo "::error::Base branch origin/$BASE not found on remote. Push that branch first, or fix target_branch in the documentation dispatch payload."
+            exit 1
+          fi
+          git checkout -B "$SYNC_BRANCH" "origin/$BASE"
+          echo "sync_branch=$SYNC_BRANCH" >> $GITHUB_OUTPUT
+          echo "Using branch $SYNC_BRANCH (PR → $BASE)"
 
       - name: Write payload
         run: |
@@ -19,6 +82,8 @@ jobs:
           p = json.loads(os.environ.get('CLIENT_PAYLOAD', '{}'))
           if p and 'skills' not in p and p.get('skill_name'):
             p = {'skills': [p]}
+          for k in ('target_branch', 'direct_push'):
+            p.pop(k, None)
           json.dump(p if p else {'skills': []}, open('/tmp/payload.json', 'w'))
           "
         env:
@@ -28,12 +93,48 @@ jobs:
         id: apply
         run: python3 scripts/apply_sync_payload.py "$GITHUB_WORKSPACE" @/tmp/payload.json
 
-      - name: Commit and push
+      - name: Commit and push (direct to base)
+        if: steps.mode.outputs.direct == 'true'
+        env:
+          GIT_TERMINAL_PROMPT: 0
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="${{ steps.branch.outputs.branch }}"
           git diff --quiet && git diff --staged --quiet && echo "No changes to commit" || {
             git add -A
             git commit -m "chore(skills): sync from LYZR ADK docs [automated]"
-            git push
+            git push origin "$BRANCH"
           }
+
+      - name: Commit, push branch, open PR
+        if: steps.mode.outputs.direct != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.IDE_SKILLS_WORKFLOW_TOKEN || github.token }}
+          GIT_TERMINAL_PROMPT: 0
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          SYNC_BRANCH="${{ steps.sync_branch.outputs.sync_branch }}"
+          BASE="${{ steps.branch.outputs.branch }}"
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "::notice::No file changes after apply — skills already match payload; skipping PR."
+            exit 0
+          fi
+          git add -A
+          git commit -m "chore(skills): sync from LYZR ADK docs [automated]"
+          git push -u origin "$SYNC_BRANCH"
+          {
+            echo "Automated sync from LYZR ADK documentation (\`repository_dispatch\` \`adk-docs-sync\`)."
+            echo ""
+            echo "- **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- Please review updates under \`skills/\` and merge when ready."
+          } > /tmp/pr-body.md
+          gh auth status
+          PR_URL=$(gh pr create \
+            --base "$BASE" \
+            --head "$SYNC_BRANCH" \
+            --title "chore(skills): ADK docs → skills sync" \
+            --body-file /tmp/pr-body.md)
+          echo "::notice::Opened PR: ${PR_URL}"

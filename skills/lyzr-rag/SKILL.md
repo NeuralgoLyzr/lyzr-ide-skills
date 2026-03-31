@@ -1,6 +1,13 @@
 ---
 name: lyzr-rag
 description: Add retrieval-augmented generation (RAG) to LYZR agents. Covers creating knowledge bases, ingesting documents (PDF, DOCX, websites, text), querying, and connecting to agents.
+license: MIT
+allowed-tools:
+  - Studio
+  - KnowledgeBase
+  - create_knowledge_base
+  - query
+  - agent.run
 triggers:
   - lyzr rag
   - lyzr knowledge base
@@ -8,17 +15,26 @@ triggers:
   - lyzr vector store
   - lyzr retrieval
   - build rag with lyzr
-version: 1.0.0
-author: LYZR AI
+metadata:
+  author: LYZR AI
+  version: "1.0.0"
+  category: rag
 ---
 
 # LYZR RAG (Knowledge Base) Skill
 
+## Instructions
+
+1. Use this skill for knowledge bases, document ingestion, retrieval, and wiring KBs into `agent.run(..., knowledge_bases=[...])`.
+2. Require `LYZR_API_KEY`; use vector store and embedding names from this file unless docs specify otherwise.
+3. Prefer examples here over paraphrase; do not invent KB methods or parameters.
+4. Preserve mapped `##` / `###` headings when syncing from documentation.
+
 ## Overview
- 
+
 LYZR's RAG system lets you ingest documents and websites into a vector store, then have your agents retrieve relevant context before answering questions.
 
-**Supported vector stores:** Qdrant, Weaviate, PG-Vector, Milvus, Amazon Neptune
+**Supported vector stores:** Qdrant, Weaviate, PG Vector, Milvus, Neptune, Pinecone
 
 ---
 
@@ -36,13 +52,17 @@ export LYZR_API_KEY="your-api-key"
 ```python
 from lyzr import Studio
 
-studio = Studio()
+studio = Studio()api_key="your-api-key"
 
 kb = studio.create_knowledge_base(
     name="my_knowledge_base",
     vector_store="qdrant",                    # qdrant | weaviate | pg_vector | milvus | neptune
-    embedding_model="text-embedding-3-large"  # OpenAI embedding model
+    embedding_model="text-embedding-3-large", # OpenAI embedding model
+    llm_model="gpt-4o",                       # LLM for query processing
+    description="My custom knowledge base"    # Optional description
 )
+
+print(f"Created KB: {kb.id}")
 ```
 
 ---
@@ -54,26 +74,43 @@ kb = studio.create_knowledge_base(
 kb.add_pdf(
     "path/to/document.pdf",
     chunk_size=1024,      # tokens per chunk (default: 1024)
-    chunk_overlap=128     # overlap between chunks (default: 128)
+    chunk_overlap=128,    # overlap between chunks (default: 128)
+    data_parser="llmsherpa", # PDF parser to use
+    extra_info=None       # optional metadata as JSON string
 )
 ```
 
 ### Add a Word Document
 ```python
-kb.add_docx("path/to/report.docx")
+kb.add_docx("path/to/report.docx",
+    chunk_size=1024,      # tokens per chunk (default: 1024)
+    chunk_overlap=128,    # overlap between chunks (default: 128)
+    data_parser="docx2txt", # Document parser
+    extra_info=None       # optional metadata
+)
 ```
 
 ### Add a Plain Text File
 ```python
-kb.add_txt("path/to/notes.txt")
+kb.add_txt("path/to/notes.txt",
+    chunk_size=1024,      # tokens per chunk (default: 1024)
+    chunk_overlap=128,    # overlap between chunks (default: 128)
+    data_parser="simple", # Text parser
+    extra_info=None       # optional metadata
+)
 ```
 
 ### Add a Website (Crawled)
 ```python
 kb.add_website(
     "https://docs.yoursite.com",
-    max_pages=50,   # max pages to crawl (default: 10)
-    max_depth=2     # crawl depth (default: 2)
+    max_pages=50,   # max pages to crawl (default: 1)
+    max_depth=2,    # crawl depth (default: 0)
+    chunk_size=1024,      # tokens per chunk (default: 1024)
+    chunk_overlap=128,    # overlap between chunks (default: 128)
+    dynamic_content_wait_secs=None, # wait time for dynamic content
+    dynamic_content_wait_secs=5, # wait time for dynamic content
+    crawler_type="cheerio" # Crawler type
 )
 ```
 
@@ -81,7 +118,9 @@ kb.add_website(
 ```python
 kb.add_text(
     "Our support hours are Monday–Friday, 9am–5pm EST.",
-    source="faq"   # label for tracking
+    source="faq",  # label for tracking
+    chunk_size=1024,      # tokens per chunk (default: 1024)
+    chunk_overlap=128     # overlap between chunks (default: 128)
 )
 ```
 
@@ -95,6 +134,8 @@ results = kb.query(
     top_k=3,                    # number of results to return
     retrieval_type="basic",     # "basic" (default) | "mmr" | "hyde" | "time_aware"
     score_threshold=0.5         # min similarity score (0.0–1.0)
+    lambda_param=None,          # hybrid search parameter (0=keyword, 1=semantic)
+    time_decay_factor=None      # time decay for time_aware retrieval
 )
 
 for result in results:
@@ -112,11 +153,13 @@ for result in results:
 ```python
 agent = studio.create_agent(
     name="Docs Assistant",
-    provider="openai/gpt-4o",
-    role="Documentation expert",
-    goal="Answer questions using company documentation",
-    instructions="Always base answers on the provided documents. If unsure, say so."
+    provider="gpt-4o"
 )
+response = agent.run(
+    "What is the return policy?",
+    knowledge_bases=[kb]
+)
+print(response.response)
 
 # Pass knowledge base at run time
 response = agent.run(
@@ -209,3 +252,73 @@ print(response.response)
 - Use `kb.reset()` instead of deleting and recreating the KB when refreshing content
 - Run `kb.query()` directly first to validate retrieval quality before connecting to an agent
 - For large doc sets, increase `max_pages` and `max_depth` on `add_website()` carefully — it costs tokens
+
+
+## ADK: knowledge-bases/overview
+
+Source: `knowledge-bases/overview.mdx`
+
+    Knowledge bases enable Retrieval Augmented Generation (RAG) by storing and querying documents. Agents can use knowledge bases to answer questions based on your documents, websites, and other content.
+
+    ## Quick Start
+
+    ```python
+    from lyzr import Studio
+
+    studio = Studio(api_key="your-api-key")
+
+    # Create a knowledge base
+    kb = studio.create_knowledge_base(
+        name="product_docs",
+        vector_store="qdrant",
+        embedding_model="text-embedding-3-large"
+    )
+
+    # Add documents
+    kb.add_pdf("manual.pdf")
+    kb.add_website("https://docs.example.com", max_pages=50)
+
+    # Create an agent with the knowledge base
+    agent = studio.create_agent(
+        name="Support Bot",
+        provider="gpt-4o",
+        role="Customer support",
+        goal="Answer questions using documentation",
+        instructions="Use the knowledge base to answer questions accurately"
+    )
+
+    # Query with the knowledge base
+    response = agent.run(
+        "How do I reset my password?",
+        knowledge_bases=[kb]
+    )
+    print(response.response)
+    ```
+
+    ## What is a Knowledge Base?
+
+    A knowledge base is a vector database that stores your documents as embeddings. When an agent receives a question, it:
+
+    1. **Searches** the knowledge base for relevant content
+    2. **Retrieves** the most relevant chunks
+    3. **Generates** a response using the retrieved context
+
+    This is called Retrieval Augmented Generation (RAG).
+
+    ## Supported Document Types
+
+    | Type | Method | Description |
+    |------|--------|-------------|
+    | PDF | `add_pdf()` | PDF documents |
+    | DOCX | `add_docx()` | Word documents |
+    | TXT | `add_txt()` | Plain text files |
+    | Website | `add_website()` | Web pages with crawling |
+    | Text | `add_text()` | Raw t
+
+_(truncated)_
+
+
+## ADK: knowledge-bases/querying
+
+
+## ADK: knowledge-bases/managing-kb

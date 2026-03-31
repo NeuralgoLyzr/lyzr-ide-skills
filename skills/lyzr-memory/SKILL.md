@@ -1,6 +1,13 @@
 ---
 name: lyzr-memory
 description: Add conversation memory and persistent context to LYZR agents. Covers built-in message memory, session management, and external memory providers (Mem0, AWS AgentCore, SuperMemory).
+license: MIT
+allowed-tools:
+  - Studio
+  - Agent
+  - session_id
+  - memory
+  - create_memory_credential
 triggers:
   - lyzr memory
   - lyzr conversation history
@@ -8,18 +15,27 @@ triggers:
   - remember across messages lyzr
   - lyzr persistent memory
   - add memory to lyzr agent
-version: 1.0.0
-author: LYZR AI
+metadata:
+  author: LYZR AI
+  version: "1.0.0"
+  category: memory
 ---
 
 # LYZR Memory Skill
+
+## Instructions
+
+1. Use this skill for built-in message memory, `session_id` continuity, and external providers (Mem0, AWS AgentCore, SuperMemory).
+2. Require `LYZR_API_KEY`; provider keys belong in env or secure config, never in committed code.
+3. Stress one stable `session_id` per conversation when explaining multi-turn behavior.
+4. Preserve mapped section headings when documentation sync updates this file.
 
 ## Overview
 
 LYZR supports two memory approaches:
 
-1. **Built-in message memory** — keeps the last N messages in context (simple, no extra setup)
-2. **External memory providers** — persistent memory via Mem0, AWS AgentCore, or SuperMemory
+1. **Built-in message memory** — maintains conversation context across multiple messages within a session (simple, no extra setup)
+2. **External memory providers** — persistent memory options include Mem0, AWS AgentCore, and SuperMemory
 
 ---
 
@@ -45,18 +61,18 @@ studio = Studio()
 
 agent = studio.create_agent(
     name="Conversational Bot",
-    provider="openai/gpt-4o",
+    provider="gpt-4o",
     role="Helpful assistant",
     goal="Maintain context across a conversation",
     instructions="Remember what users tell you and refer back to it",
-    memory=30    # Keep last 30 messages in context window
+    memory=30  # Integer: number of messages to remember
 )
 ```
 
 ### Add Memory to an Existing Agent
 
 ```python
-agent = agent.add_memory(max_messages=50)
+agent = agent.add_memory(max_messages=10  # Messages to remember (1-50))
 ```
 
 ### Remove Memory
@@ -68,7 +84,7 @@ agent = agent.remove_memory()
 ### Check Memory Status
 
 ```python
-has_memory = agent.has_memory()   # Returns True/False
+has_memory = agent.has_memory() -> bool  # Returns True or False
 ```
 
 ---
@@ -104,7 +120,7 @@ For persistent memory that survives beyond a session window.
 mem0_credential = studio.create_memory_credential(
     provider="mem0",
     name="Mem0 Memory",
-    mem0_api_key="your-mem0-api-key"   # From mem0.ai
+    api_key="your-mem0-api-key"  # From mem0.ai
 )
 ```
 
@@ -114,9 +130,9 @@ mem0_credential = studio.create_memory_credential(
 aws_credential = studio.create_memory_credential(
     provider="aws-agentcore",
     name="AWS Memory",
-    aws_access_key_id="AKIA...",
-    aws_secret_access_key="your-secret",
-    aws_region="us-east-1"
+    aws_access_key_id="your-access-key-id",
+    aws_secret_access_key="your-secret-access-key",
+    aws_region="your-region"
 )
 
 # AWS-specific methods
@@ -187,3 +203,302 @@ print(response.response)
 - Use external providers (Mem0, AWS) when you need memory that outlasts a single session window
 - Validate credentials after creation: `credential.validate()`
 - Remove memory for stateless task agents (code generation, one-shot analysis) to save tokens
+
+
+## ADK: Unmapped Docs
+
+
+## ADK: memory/add-memories
+
+
+## ADK: memory/agent-memory
+
+
+Source: `memory/agent-memory.mdx`
+
+    Agent memory maintains conversation context across multiple messages. Configure memory at agent creation or add it to existing agents.
+
+    ## Quick Start
+
+    ```python
+    from lyzr import Studio
+
+    studio = Studio(api_key="your-api-key")
+
+    # Create agent with memory
+    agent = studio.create_agent(
+        name="Assistant",
+        provider="gpt-4o",
+        role="Helpful assistant",
+        goal="Have contextual conversations",
+        instructions="Remember what the user told you",
+        memory=30  # Remember last 30 messages
+    )
+
+    # Conversation with context
+    session = "my_session"
+    agent.run("My favorite color is blue", session_id=session)
+    response = agent.run("What's my favorite color?", session_id=session)
+    # "Your favorite color is blue"
+    ```
+
+    ---
+
+    ## Adding Memory at Creation
+
+    Use the `memory` parameter when creating an agent:
+
+    ```python
+    agent = studio.create_agent(
+        name="Bot",
+        provider="gpt-4o",
+        role="Assistant",
+        goal="Help users",
+        instructions="Be helpful",
+        memory=30  # Integer: number of messages to remember
+    )
+    ```
+
+    ### Memory Parameter
+
+    | Value | Range | Description |
+    |-------|-------|-------------|
+    | Integer | 1-50 | Number of recent messages to keep in context |
+
+    ```python
+    # Small memory (quick exchanges)
+    agent = studio.create_agent(..., memory=10)
+
+    # Medium memory (typical conversations)
+    agent = studio.create_agent(..., memory=30)
+
+    # Large memory (complex multi-turn tasks)
+    agent = studio.create_agent(..., memory=50)
+
+    # Maximum memory
+    agent = studio.create_agent(..., memory=50)
+    ```
+
+    ---
+
+    ## Adding Memory to Existing Agent
+
+    Use `agent.add_memory()` to enable memory on an existing ag
+
+_(truncated)_
+
+
+## ADK: memory/cognis-overview
+
+
+## ADK: memory/delete-memories
+
+
+Source: `memory/delete-memories.mdx`
+
+    Cognis provides two deletion methods: `delete()` removes a single memory by ID, and `delete_session()` clears all messages and memories from an entire session.
+
+    ## Delete a Single Memory
+
+    ```python
+    from lyzr import Cognis
+
+    cog = Cognis(api_key="sk-your-api-key")
+
+    success = cog.delete(memory_id="mem_abc123")
+    print(success)  # True
+    ```
+
+    ### `delete()` Method Signature
+
+    ```python
+    cog.delete(
+        memory_id: str,
+        owner_id: str | None = None,
+    ) -> bool
+    ```
+
+    ### `delete()` Parameters
+
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `memory_id` | `str` | Yes | The ID of the memory to delete. |
+    | `owner_id` | `str` | No | Owner identifier for additional scoping. |
+
+    ### Response
+
+    Returns `True` if the memory was successfully deleted.
+
+    ## Delete an Entire Session
+
+    Remove all messages and memories associated with a session:
+
+    ```python
+    success = cog.delete_session(
+        owner_id="user_alice",
+        session_id="sess_001",
+    )
+    print(success)  # True
+    ```
+
+    ### `delete_session()` Method Signature
+
+    ```python
+    cog.delete_session(
+        owner_id: str,
+        session_id: str,
+        agent_id: str | None = None,
+    ) -> bool
+    ```
+
+    ### `delete_session()` Parameters
+
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `owner_id` | `str` | Yes | Owner/user identifier. |
+    | `session_id` | `str` | Yes | Session identifier to clear. |
+    | `agent_id` | `str` | No | Agent identifier to further scope the deletion. |
+
+    ### Response
+
+    Returns `True` if the session was successfully cleared.
+
+    ## Search and Delete Workflow
+
+    A common pattern is to
+
+_(truncated)_
+
+
+## ADK: memory/get-memories
+
+
+## ADK: memory/overview
+
+
+Source: `memory/overview.mdx`
+
+    Memory allows agents to maintain conversation context across multiple messages within a session. This enables natural, contextual conversations where the agent remembers previous interactions.
+
+    ## Quick Start
+
+    ```python
+    from lyzr import Studio
+
+    studio = Studio(api_key="your-api-key")
+
+    # Create agent with memory
+    agent = studio.create_agent(
+        name="Conversational Bot",
+        provider="gpt-4o",
+        role="Helpful assistant",
+        goal="Have natural conversations",
+        instructions="Remember context from previous messages",
+        memory=30  # Remember last 30 messages
+    )
+
+    # Start a conversation
+    session_id = "user_123_session"
+
+    agent.run("My name is Alice", session_id=session_id)
+    agent.run("I'm interested in Python programming", session_id=session_id)
+    response = agent.run("What's my name and what am I interested in?", session_id=session_id)
+
+    # Agent remembers: "Your name is Alice and you're interested in Python programming"
+    ```
+
+    ## How Memory Works
+
+    1. **Messages are stored** per session using the `session_id`
+    2. **Context is maintained** across multiple `agent.run()` calls
+    3. **Recent messages** are included in the agent's context window
+    4. **Older messages** are automatically pruned based on `max_messages`
+
+    ## Memory Configuration
+
+    | Parameter | Range | Description |
+    |-----------|-------|-------------|
+    | `memory` | 1-50 | Number of recent messages to remember |
+
+    ### At Agent Creation
+
+    ```python
+    agent = studio.create_agent(
+        name="Bot",
+        provider="gpt-4o",
+        memory=30  # Keep last 30 messages
+    )
+    ```
+
+    ### On Existing Agent
+
+    ```python
+    agent = agent.add_memory(max_messages=50)
+    ```
+
+    ## Session Management
+
+_(truncated)_
+
+
+## ADK: memory/search-memories
+
+Source: `memory/search-memories.mdx`
+
+    The `search` method performs a semantic search across stored memories, returning the most relevant results ranked by similarity score. Use it to find specific facts, preferences, or context from past conversations.
+
+    ## Basic Usage
+
+    ```python
+    from lyzr import Cognis
+
+    cog = Cognis(api_key="sk-your-api-key")
+
+    results = cog.search(query="What is the user's name?", owner_id="user_alice")
+
+    for result in results:
+        print(f"{result.content} (score: {result.score})")
+    ```
+
+    ## Method Signature
+
+    ```python
+    cog.search(
+        query: str,
+        owner_id: str | None = None,
+        agent_id: str | None = None,
+        session_id: str | None = None,
+        limit: int | None = None,
+        cross_session: bool | None = None,
+    ) -> List[CognisSearchResult]
+    ```
+
+    ## Parameters
+
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `query` | `str` | Yes | Natural language search query. |
+    | `owner_id` | `str` | No* | Filter by owner/user identifier. |
+    | `agent_id` | `str` | No* | Filter by agent identifier. |
+    | `session_id` | `str` | No* | Filter by session identifier. |
+    | `limit` | `int` | No | Maximum number of results to return. |
+    | `cross_session` | `bool` | No | Search across all sessions for the given owner. |
+
+
+
+    ## Response
+
+    Returns a `List[CognisSearchResult]`. Each result has the following fields:
+
+    | Field | Type | Description |
+    |-------|------|-------------|
+    | `id` | `str` | Memory record ID. |
+    | `content` | `str` | The memory content. |
+    | `score` | `float \| None` | Semantic similarity score (higher is more relevant). |
+    | `owner_id` | `str \| None` | Owner identifier. |
+    | `agent_id` | `str \| None` | Agent ident
+
+_(truncated)_
+
+
+## ADK: memory/update-memories

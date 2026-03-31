@@ -1,0 +1,6 @@
+.DS_Store
+.env
+scripts/.local_sync_changed.json
+scripts/.local_sync_payload.json
+scripts/.local_sync/
+__pycache__/

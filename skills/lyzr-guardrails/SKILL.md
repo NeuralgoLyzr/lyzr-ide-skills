@@ -1,6 +1,14 @@
 ---
 name: lyzr-guardrails
 description: Add responsible AI (RAI) safety guardrails to LYZR agents. Covers toxicity detection, PII protection, secrets masking, topic filtering, NSFW detection, and prompt injection prevention.
+license: MIT
+allowed-tools:
+  - Studio
+  - create_rai_policy
+  - rai_policy
+  - PIIType
+  - PIIAction
+  - SecretsAction
 triggers:
   - lyzr guardrails
   - lyzr safety
@@ -9,11 +17,20 @@ triggers:
   - lyzr toxicity
   - responsible ai lyzr
   - safe lyzr agent
-version: 1.0.0
-author: LYZR AI
+metadata:
+  author: LYZR AI
+  version: "1.0.0"
+  category: safety
 ---
 
 # LYZR Guardrails (RAI) Skill
+
+## Instructions
+
+1. Use this skill for RAI policies, PII/secrets/toxicity/topics/NSFW/prompt-injection controls on LYZR agents.
+2. Require `LYZR_API_KEY`; remind that streaming is disabled when guardrails are active where relevant.
+3. Import paths and enum names must match this file and ADK (`lyzr.rai`, `create_rai_policy`, attach via `rai_policy`).
+4. Do not rename mapped headings during doc sync—patch bodies only.
 
 ## Overview
 
@@ -26,7 +43,7 @@ LYZR's Responsible AI (RAI) system lets you add safety policies to agents to han
 - **Keyword filtering** — block or allow by keywords
 - **NSFW detection** — block inappropriate content
 - **Fairness and bias detection** — optional bias checks
-- **Prompt injection prevention** — stop jailbreak attempts
+- **Prompt injection prevention** — Prevent malicious prompt manipulation
 
 ---
 
@@ -87,7 +104,7 @@ policy = studio.create_rai_policy(
     description="Standard guardrails for customer-facing agents",
 
     # Toxicity: 0.0 = strictest, 1.0 = most permissive
-    toxicity_threshold=0.3,
+    toxicity_threshold=0.4,
 
     # Secrets: mask any detected API keys, tokens, passwords
     secrets_detection=SecretsAction.MASK,
@@ -101,8 +118,8 @@ policy = studio.create_rai_policy(
     },
 
     # Topics
-    banned_topics=["politics", "religion", "competitor products"],
-    # allowed_topics={"enabled": True, "topics": ["technology", "support"]}  # Optional whitelist
+    banned_topics=["politics", "religion", "competitors"],
+    allowed_topics={"enabled": True, "topics": ["support", "products"]},
 
     # NSFW
     nsfw_check=True,
@@ -219,3 +236,271 @@ print(response.response)
 - Note: **Streaming is disabled** when RAI guardrails are active (by design, for safety)
 - Test your policy with edge-case inputs before going to production
 - Use separate policies for different agent types (internal vs. customer-facing)
+
+
+## ADK: rai-guardrails/creating-policies
+
+
+Source: `rai-guardrails/creating-policies.mdx`
+
+    Create RAI policies to define safety guardrails for your agents. Policies can be created, updated, and applied to multiple agents.
+
+    ## Quick Start
+
+    ```python
+    from lyzr import Studio
+    from lyzr.rai import PIIType, PIIAction, SecretsAction
+
+    studio = Studio(api_key="your-api-key")
+
+    # Create a policy
+    policy = studio.create_rai_policy(
+        name="StandardSafety",
+        description="Standard safety guardrails for production",
+        toxicity_threshold=0.4,
+        prompt_injection=True,
+        pii_detection={
+            PIIType.CREDIT_CARD: PIIAction.BLOCK,
+            PIIType.EMAIL: PIIAction.REDACT
+        }
+    )
+
+    print(f"Policy created: {policy.id}")
+    ```
+
+    ---
+
+    ## studio.create_rai_policy()
+
+    ```python
+    studio.create_rai_policy(
+        name: str,
+        description: str,
+        toxicity_threshold: float = 0.4,
+        prompt_injection: bool = False,
+        secrets_detection: SecretsAction = SecretsAction.DISABLED,
+        pii_detection: Dict[PIIType, PIIAction] = None,
+        banned_topics: List[str] = None,
+        nsfw_check: bool = False,
+        nsfw_threshold: float = 0.8,
+        allowed_topics: Dict[str, Any] = None,
+        keywords: Dict[str, Any] = None,
+        fairness_and_bias: Dict[str, Any] = None
+    ) -> RAIPolicy
+    ```
+
+    ### Parameters
+
+    | Parameter | Type | Default | Description |
+    |-----------|------|---------|-------------|
+    | `name` | str | Required | Policy name |
+    | `description` | str | Required | Policy description |
+    | `toxicity_threshold` | float | 0.4 | Toxicity detection threshold (0.0-1.0) |
+    | `prompt_injection` | bool | False | Enable prompt injection detection |
+    | `secrets_detection` | SecretsAction | DISABLED | How to handle secrets |
+    | `pii_d
+
+_(truncated)_
+
+
+Source: `rai-guardrails/creating-policies.mdx`
+
+    Create RAI policies to define safety guardrails for your agents. Policies can be created, updated, and applied to multiple agents.
+
+    ## Quick Start
+
+    ```python
+    from lyzr import Studio
+    from lyzr.rai import PIIType, PIIAction, SecretsAction
+
+    studio = Studio(api_key="your-api-key")
+
+    # Create a policy
+    policy = studio.create_rai_policy(
+        name="StandardSafety",
+        description="Standard safety guardrails for production",
+        toxicity_threshold=0.4,
+        prompt_injection=True,
+        pii_detection={
+            PIIType.CREDIT_CARD: PIIAction.BLOCK,
+            PIIType.EMAIL: PIIAction.REDACT
+        }
+    )
+
+    print(f"Policy created: {policy.id}")
+    ```
+
+    ---
+
+    ## studio.create_rai_policy()
+
+    ```python
+    studio.create_rai_policy(
+        name: str,
+        description: str,
+        toxicity_threshold: float = 0.4,
+        prompt_injection: bool = False,
+        secrets_detection: SecretsAction = SecretsAction.DISABLED,
+        pii_detection: Dict[PIIType, PIIAction] = None,
+        banned_topics: List[str] = None,
+        nsfw_check: bool = False,
+        nsfw_threshold: float = 0.8,
+        allowed_topics: Dict[str, Any] = None,
+        keywords: Dict[str, Any] = None,
+        fairness_and_bias: Dict[str, Any] = None
+    ) -> RAIPolicy
+    ```
+
+    ### Parameters
+
+    | Parameter | Type | Default | Description |
+    |-----------|------|---------|-------------|
+    | `name` | str | Required | Policy name |
+    | `description` | str | Required | Policy description |
+    | `toxicity_threshold` | float | 0.4 | Toxicity detection threshold (0.0-1.0) |
+    | `prompt_injection` | bool | False | Enable prompt injection detection |
+    | `secrets_detection` | SecretsAction | DISABLED | How to handle secrets |
+    | `pii_d
+
+_(truncated)_
+
+
+## ADK: rai-guardrails/rai-features
+
+Source: `rai-guardrails/rai-features.mdx`
+
+    Learn about each RAI feature in detail, including configuration options, thresholds, and best practices.
+
+    ## Toxicity Detection
+
+    Detect and filter toxic, harmful, or offensive content in user inputs and agent outputs.
+
+    ### Configuration
+
+    ```python
+    policy = studio.create_rai_policy(
+        name="ToxicityFilter",
+        description="Filter toxic content",
+        toxicity_threshold=0.4  # 0.0 = strictest, 1.0 = disabled
+    )
+    ```
+
+    ### Threshold Guidelines
+
+    | Threshold | Strictness | Use Case |
+    |-----------|------------|----------|
+    | 0.1 - 0.2 | Very strict | Children's content, healthcare |
+    | 0.3 - 0.4 | Strict | Customer service, public apps |
+    | 0.5 - 0.6 | Moderate | Internal tools, adult apps |
+    | 0.7 - 0.9 | Relaxed | Research, content analysis |
+    | 1.0 | Disabled | No filtering |
+
+    ### Example
+
+    ```python
+    # Strict toxicity filtering
+    strict_policy = studio.create_rai_policy(
+        name="StrictToxicity",
+        description="Very strict toxicity filtering",
+        toxicity_threshold=0.2
+    )
+
+    # Moderate toxicity filtering
+    moderate_policy = studio.create_rai_policy(
+        name="ModerateToxicity",
+        description="Standard toxicity filtering",
+        toxicity_threshold=0.4
+    )
+    ```
+
+    ---
+
+    ## Prompt Injection Detection
+
+    Protect agents from malicious prompt manipulation attacks that attempt to override instructions or extract sensitive information.
+
+    ### Configuration
+
+    ```python
+    policy = studio.create_rai_policy(
+        name="InjectionProtection",
+        description="Prevent prompt injection",
+        prompt_injection=True
+    )
+    ```
+
+    ### What It Detects
+
+    - Instruction override attempts ("Ignore previous instructions...")
+    - Role manipulat
+
+_(truncated)_
+
+Source: `rai-guardrails/rai-features.mdx`
+
+    Learn about each RAI feature in detail, including configuration options, thresholds, and best practices.
+
+    ## Toxicity Detection
+
+    Detect and filter toxic, harmful, or offensive content in user inputs and agent outputs.
+
+    ### Configuration
+
+    ```python
+    policy = studio.create_rai_policy(
+        name="ToxicityFilter",
+        description="Filter toxic content",
+        toxicity_threshold=0.4  # 0.0 = strictest, 1.0 = disabled
+    )
+    ```
+
+    ### Threshold Guidelines
+
+    | Threshold | Strictness | Use Case |
+    |-----------|------------|----------|
+    | 0.1 - 0.2 | Very strict | Children's content, healthcare |
+    | 0.3 - 0.4 | Strict | Customer service, public apps |
+    | 0.5 - 0.6 | Moderate | Internal tools, adult apps |
+    | 0.7 - 0.9 | Relaxed | Research, content analysis |
+    | 1.0 | Disabled | No filtering |
+
+    ### Example
+
+    ```python
+    # Strict toxicity filtering
+    strict_policy = studio.create_rai_policy(
+        name="StrictToxicity",
+        description="Very strict toxicity filtering",
+        toxicity_threshold=0.2
+    )
+
+    # Moderate toxicity filtering
+    moderate_policy = studio.create_rai_policy(
+        name="ModerateToxicity",
+        description="Standard toxicity filtering",
+        toxicity_threshold=0.4
+    )
+    ```
+
+    ---
+
+    ## Prompt Injection Detection
+
+    Protect agents from malicious prompt manipulation attacks that attempt to override instructions or extract sensitive information.
+
+    ### Configuration
+
+    ```python
+    policy = studio.create_rai_policy(
+        name="InjectionProtection",
+        description="Prevent prompt injection",
+        prompt_injection=True
+    )
+    ```
+
+    ### What It Detects
+
+    - Instruction override attempts ("Ignore previous instructions...")
+    - Role manipulat
+
+_(truncated)_

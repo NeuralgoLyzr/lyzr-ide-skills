@@ -1,53 +1,97 @@
-# LLM prompt: Section-level skill update
+# LLM prompt: Surgical patch updates
 
-Use this prompt when the ADK doc has changed and you need to output **only** the updated content for the affected skill section(s). The LLM must not return the entire SKILL.md.
+Use this prompt when ADK docs changed and the skill file must be updated with minimal, doc-backed diffs only.
 
-## System prompt (optional)
+## System prompt
 
-You are updating a Cursor Agent Skill from LYZR ADK documentation. Output ONLY the replacement content for the affected skill section(s). Preserve the same heading level and format. Do not output the entire file. Use the same SKILL.md style: concise, code blocks with python, tables where the doc has tables. Strip any MDX/React components (e.g. Card, Warning) into plain markdown.
+You update Cursor skill sections using strict patch hunks. Output ONLY valid JSON (no markdown code fences).
+
+Rules:
+1. Use ADK docs as the only source of truth.
+2. Do not rewrite full sections.
+3. Do not rename/reorder headings or alter unrelated text.
+4. Preserve identifiers, formatting, and code style unless docs require a change.
+5. If there is no required change, return `{"updates": []}`.
+
+Output schema:
+`{"updates":[{"section_heading":"## Exact Heading","patches":[{"context_before":"...","old":"...","new":"...","context_after":"..."}]}]}`
+
+Patch semantics:
+- Each patch applies inside one section body only.
+- Replace one occurrence of `context_before + old + context_after` with `context_before + new + context_after` (exact match preferred).
+- If full anchor is error-prone, use **empty** `context_before` and `context_after` and set `old` to a **unique** substring copied verbatim from the section (multi-line snippet is best; single-line `old` must be long enough to appear only once).
+- For insertion: `old` is empty; `context_before + context_after` must match once.
+- For deletion: `new` is empty.
+- Never paraphrase `old`; it must match file text (newlines matter; the apply step may try minor newline variants).
 
 ## User prompt template
 
 ```
-doc_path: {{doc_path}}
+doc_paths: {{doc_paths}}
 skill: {{skill_name}}
-section_heading(s) to update: {{section_headings}}
+target_heading: {{section_heading}}
 
-Current content of the section(s) in the skill file:
+Skill file structure (ordered headings; immutable):
+{{skill_structure}}
+
+Current target section body:
 ---
 {{current_skill_section_content}}
 ---
 
-New doc content (from LYZR ADK):
+Doc excerpts (ADK source of truth):
 ---
 {{doc_content}}
 ---
 
-Instructions: Output valid JSON only, no markdown code fence. Format:
-{"updates": [{"section_heading": "## Exact Heading From Skill", "content": "markdown content for that section only"}]}
+Allowed heading: {{section_heading}}
 
-Merge the new doc content into the skill style. Update only what changed; keep the same structure. If the doc adds a new subsection, include it under the same section_heading or add a new object with the new section_heading. Do not include the frontmatter or other sections.
+Rules:
+- Return JSON only with keys `updates`, `section_heading`, and `patches`.
+- Output only one update for the allowed heading.
+- Use patch hunks only; do not output a full rewritten section.
+- Keep hunks minimal and doc-backed.
+- Do not include headings in `old` or `new`.
+- Maintain balanced code fences and valid markdown.
+- If no meaningful doc-backed change exists, return {"updates": []}.
 ```
 
-## Expected output (JSON)
+## Expected output
 
 ```json
 {
   "updates": [
     {
       "section_heading": "## Step 2: Create an Agent",
-      "content": "Updated markdown for this section only..."
+      "patches": [
+        {
+          "context_before": "from lyzr import Agent\\n",
+          "old": "agent = Agent(name=\"demo\")\\n",
+          "new": "agent = Agent(name=\"demo\", file_output=True)\\n",
+          "context_after": "response = agent.run(\"hi\")\\n"
+        }
+      ]
     }
   ]
 }
 ```
 
-- `section_heading`: Must match the skill file exactly (e.g. `## Error Handling`, `## Contexts`).
-- `content`: Full markdown body for that section (no extra `##` in the content; the applier uses section_heading to replace).
+## New skill system prompt
 
-## New skill (full SKILL.md)
+You author a **complete** `SKILL.md` for a Cursor agent skill from LYZR ADK documentation excerpts.
 
-When the doc path maps to a **new** skill (e.g. new folder in ADK), use a separate prompt that asks for a **full** SKILL.md:
-
-- Input: full doc content, skill name (e.g. `lyzr-file-image-output`), instruction to output one markdown document with YAML frontmatter (name, description, triggers, version, author) and body (Overview, Setup, step-by-step sections, Best Practices). Strip MDX. Keep under ~500 lines.
-- Output: full file content as a single markdown string (or JSON `{"full_content": "..."}`).
+Output rules:
+- Return **only** the markdown file body. Do not wrap in JSON.
+- You may wrap the whole file in one markdown code fence; if you do, nothing may appear outside that fence.
+- The file **must** start with YAML frontmatter between `---` lines, in this exact shape:
+  - `name` (string) — must match the skill folder name from the user message (kebab-case, e.g. `lyzr-billing`)
+  - `description` (string) — one-line summary of what the skill covers
+  - `license` — use `MIT`
+  - `allowed-tools` (YAML list of short strings) — SDK or API capability hints for this skill (e.g. `Studio`, `KnowledgeBase`), not unrelated generic tools
+  - `triggers` (YAML list of short strings) — natural phrases that should activate this skill in the IDE
+  - `metadata` (mapping): `author` (e.g. `LYZR AI`), `version` (quoted semver string), `category` (one of: `sdk`, `rag`, `memory`, `safety`, `output`, `assets`, or another single lowercase slug that fits the domain)
+- Do **not** put `version` or `author` at the top level of frontmatter; they live only under `metadata`.
+- After frontmatter, use exactly: one H1 title line (`# ...`), then **`## Instructions`** with numbered steps (when to use the skill, env vars like `LYZR_API_KEY`, and that mapped doc-sync headings must not be renamed).
+- Then `## Overview`, then `## Setup` (`pip install lyzr-adk`, `LYZR_API_KEY`), then additional `##` / `###` sections that reflect the documentation (API usage, code examples). Use headings consistent with ADK doc structure where possible.
+- Strip MDX-only constructs; use plain markdown. Preserve code identifiers from the docs.
+- Keep under ~450 lines. Use fenced code blocks with language tags (e.g. python). Code fences must be balanced (even count of ```).
