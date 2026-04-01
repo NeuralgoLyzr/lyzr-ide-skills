@@ -2,11 +2,7 @@
 name: lyzr-assets
 description: Upload, store, and manage file assets (PDF, DOCX, images). Extract text from documents; list, get, and delete assets via the API. **Total Endpoints:** 4
 license: Apache-2.0
-allowed-tools:
-  - Studio
-  - assets-api
-  - upload
-  - list-assets
+allowed-tools: Studio assets-api upload list-assets
 triggers:
 - lyzr assets
 - lyzr file upload

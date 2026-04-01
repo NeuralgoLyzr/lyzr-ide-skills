@@ -7,7 +7,7 @@ Cursor skills for the **LYZR ADK** Python SDK (`lyzr-adk`). This repo keeps `ski
 Run this in your terminal (Cursor, Claw, or any shell) to pull this repo into your project as a git agent:
 
 ```bash
-npx @open-gitagent/gitagent@latest run -r https://github.com/NeuralgoLyzr/lyzr-ide-skills -a claude
+npx @open-gitagent/gitagent@0.1.7 run -r https://github.com/NeuralgoLyzr/lyzr-ide-skills -a claude
 ```
 
 Then use the same skills in your IDE or agent workflow as usual.

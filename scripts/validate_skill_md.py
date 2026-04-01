@@ -18,6 +18,14 @@ REQUIRED_TOP = ("name", "description", "license", "allowed-tools", "triggers", "
 REQUIRED_META = ("author", "version", "category")
 
 
+def _allowed_tools_valid(value: object) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, list):
+        return bool(value) and all(isinstance(x, str) for x in value)
+    return False
+
+
 def validate_skill_frontmatter(content: str) -> tuple[bool, str]:
     if yaml is None:
         return False, "PyYAML required: pip install pyyaml"
@@ -38,8 +46,11 @@ def validate_skill_frontmatter(content: str) -> tuple[bool, str]:
     for key in REQUIRED_TOP:
         if key not in data:
             return False, f"Frontmatter missing required key: {key}"
-    if not isinstance(data.get("allowed-tools"), list):
-        return False, "allowed-tools must be a YAML list"
+    if not _allowed_tools_valid(data.get("allowed-tools")):
+        return (
+            False,
+            "allowed-tools must be a non-empty space-delimited string (GitAgent) or a non-empty list of strings",
+        )
     if not isinstance(data.get("triggers"), list):
         return False, "triggers must be a YAML list"
     meta = data.get("metadata")

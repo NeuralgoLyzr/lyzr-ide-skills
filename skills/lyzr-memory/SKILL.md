@@ -2,12 +2,7 @@
 name: lyzr-memory
 description: Add conversation memory and persistent context to LYZR agents. Covers built-in message memory, session management, and external memory providers (Mem0, AWS AgentCore, SuperMemory).
 license: Apache-2.0
-allowed-tools:
-  - Studio
-  - Agent
-  - session_id
-  - memory
-  - create_memory_credential
+allowed-tools: Studio Agent session_id memory create_memory_credential
 triggers:
   - lyzr memory
   - lyzr conversation history

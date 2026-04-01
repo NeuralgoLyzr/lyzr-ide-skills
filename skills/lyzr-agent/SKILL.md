@@ -2,13 +2,7 @@
 name: lyzr-agent
 description: Create and manage AI agents via the API. Supports CRUD, configuration, versioning, and agent lifecycle. **Total Endpoints:** 12
 license: Apache-2.0
-allowed-tools:
-  - Studio
-  - Agent
-  - create_agent
-  - tools
-  - contexts
-  - sessions
+allowed-tools: Studio Agent create_agent tools contexts sessions
 triggers:
 - create a lyzr agent
 - build an agent with lyzr
